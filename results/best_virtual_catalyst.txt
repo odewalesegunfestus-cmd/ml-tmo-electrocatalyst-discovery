@@ -1,0 +1,9 @@
+Best Virtual Catalyst
+
+Ni = 0.7
+Co = 0.2
+Fe = 0.1
+
+Predicted Overpotential = 195.0 mV
+
+Generated using Linear Regression model trained on Ni-Co-Fe electrocatalyst dataset.
