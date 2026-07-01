@@ -1,9 +1,13 @@
-Best Virtual Catalyst
-
-Ni = 0.7
-Co = 0.2
-Fe = 0.1
-
-Predicted Overpotential = 195.0 mV
-
-Generated using Linear Regression model trained on Ni-Co-Fe electrocatalyst dataset.
+Ni_fraction                  0.015308
+Co_fraction                  0.984113
+Fe_fraction                  0.000579
+Calcination_temp_C         454.000000
+Surface_area_m2g           126.320000
+Oxygen_vacancy_percent      11.772000
+Ni3_Ni2_ratio                2.285200
+Co3_Co2_ratio                1.210000
+ECSA_cm2                    99.360000
+Predicted_Overpotential    214.184901
+Uncertainty                 13.731737
+EI_score                   200.453164
+Name: 2107, dtype: float64

@@ -1,108 +1,114 @@
-# Import Pandas for reading and working with catalyst dataset tables
+from pathlib import Path
 import pandas as pd
 
-# Import Matplotlib for creating and saving graphs
-import matplotlib.pyplot as plt
+from scipy.stats import qmc
+from sklearn.gaussian_process import GaussianProcessRegressor
 
-# Import Linear Regression model for simple machine learning prediction
-from sklearn.linear_model import LinearRegression
+# Locate project folder
+project_root = Path(__file__).resolve().parent.parent
 
-# Import R2 score for measuring model accuracy
-from sklearn.metrics import r2_score
+# Load dataset
+csv_file = project_root / "data" / "demodata1.csv"
+catalyst_data = pd.read_csv(csv_file)
 
+# 9 input features
+feature_columns = [
+    "Ni_fraction",
+    "Co_fraction",
+    "Fe_fraction",
+    "Calcination_temp_C",
+    "Surface_area_m2g",
+    "Oxygen_vacancy_percent",
+    "Ni3_Ni2_ratio",
+    "Co3_Co2_ratio",
+    "ECSA_cm2"
+]
 
-# Load the catalyst dataset from the data folder
-data = pd.read_csv("data/catalyst_data.csv")
+X = catalyst_data[feature_columns]
 
+# Target
+y = catalyst_data["Overpotential_10mA_mV"]
 
-# Select the catalyst composition columns as input features
-X = data[["Ni", "Co", "Fe"]]
+# Train final GPR model on all 25 catalysts
+gpr = GaussianProcessRegressor()
+gpr.fit(X, y)
 
+# Generate 5000 LHS virtual catalysts using Ni and Co
+sampler = qmc.LatinHypercube(d=2, seed=42)
+sample = sampler.random(n=10000)
 
-# Select overpotential as the target value to be predicted
-y = data["Overpotential_mV"]
+virtual_data = []
 
+for row in sample:
+    Ni = row[0]
+    Co = row[1]
+    Fe = 1 - Ni - Co
 
-# Create the Linear Regression model
-model = LinearRegression()
+    if Fe >= 0:
+        virtual_data.append([Ni, Co, Fe])
 
+    if len(virtual_data) == 5000:
+        break
 
-# Train the model using catalyst composition and overpotential data
-model.fit(X, y)
+virtual_catalysts = pd.DataFrame(
+    virtual_data,
+    columns=["Ni_fraction", "Co_fraction", "Fe_fraction"]
+)
 
+# Add average values for the remaining 6 features
+for column in feature_columns[3:]:
+    virtual_catalysts[column] = catalyst_data[column].mean()
 
-# Predict overpotential for all catalysts in the dataset
-predictions = model.predict(X)
+# Predict overpotential and uncertainty
+prediction, uncertainty = gpr.predict(
+    virtual_catalysts[feature_columns],
+    return_std=True
+)
 
+virtual_catalysts["Predicted_Overpotential"] = prediction
+virtual_catalysts["Uncertainty"] = uncertainty
 
-# Add the predicted values as a new column in the dataset
-data["Predicted_Overpotential"] = predictions
+# Rank catalysts from best to worst
 
+ranked_catalysts = virtual_catalysts.sort_values(
+    by="Predicted_Overpotential",
+    ascending=True
+)
 
-# Calculate R2 score to evaluate model performance
-score = r2_score(y, predictions)
+print(ranked_catalysts.head(10))
 
+# Create EI score
 
-# Print the R2 score in the terminal
-print("R2 Score:")
-print(score)
+virtual_catalysts["EI_score"] = (
+    virtual_catalysts["Predicted_Overpotential"]
+    - virtual_catalysts["Uncertainty"]
+)
+# Rank by Expected Improvement
 
+ei_ranked = virtual_catalysts.sort_values(
+    by="EI_score",
+    ascending=True
+)
 
-# Save the dataset with predictions into the results folder
-data.to_csv("results/catalyst_predictions.csv", index=False)
+print("\nTOP 10 BY EXPECTED IMPROVEMENT\n")
 
+print(ei_ranked.head(10))
 
-# Create a clean graph size for publication-style output
-plt.figure(figsize=(8, 6))
+# Create results folder if it does not exist
+results_folder = project_root / "results"
+results_folder.mkdir(exist_ok=True)
 
+# Save all EI-ranked catalysts
+ei_ranked.to_csv(results_folder / "ranked_virtual_catalysts.csv", index=False)
 
-# Plot actual overpotential against predicted overpotential
-plt.scatter(data["Overpotential_mV"], data["Predicted_Overpotential"])
+# Select best catalyst
+best_catalyst = ei_ranked.iloc[0]
 
+# Save best catalyst to text file
+with open(results_folder / "best_virtual_catalyst.txt", "w") as file:
+    file.write(str(best_catalyst))
 
-# Add a diagonal reference line for perfect prediction
-plt.plot([190, 250], [190, 250], "--")
+print("\nBEST VIRTUAL CATALYST\n")
+print(best_catalyst)
 
-
-# Label the x-axis
-plt.xlabel("Actual Overpotential (mV)")
-
-
-# Label the y-axis
-plt.ylabel("Predicted Overpotential (mV)")
-
-
-# Add graph title
-plt.title("Linear Regression Model Performance")
-
-
-# Add grid lines for easier reading
-plt.grid(True)
-
-
-# Save the graph as a high-resolution PNG file
-plt.savefig("figures/predicted_vs_actual.png", dpi=300, bbox_inches="tight")
-
-
-# Show the graph on screen
-plt.show()
-
-
-# Rank catalysts from lowest predicted overpotential to highest
-ranked = data.sort_values(by="Predicted_Overpotential")
-
-
-# Save the ranked catalyst table into the results folder
-ranked.to_csv("results/ranked_catalysts.csv", index=False)
-
-
-# Print a blank line for cleaner terminal output
-print()
-
-
-# Print the heading for the best catalyst candidates
-print("TOP 5 CATALYSTS")
-
-
-# Print the top five catalyst candidates
-print(ranked[["Catalyst_ID", "Predicted_Overpotential"]].head())
+print("\nFiles saved successfully.")
