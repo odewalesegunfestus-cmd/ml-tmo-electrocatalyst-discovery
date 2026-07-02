@@ -94,9 +94,20 @@ print("\nTOP 10 BY EXPECTED IMPROVEMENT\n")
 
 print(ei_ranked.head(10))
 
+
 # Create results folder if it does not exist
 results_folder = project_root / "results"
 results_folder.mkdir(exist_ok=True)
+
+# Save Top 10 virtual catalysts
+top10_virtual = ei_ranked.head(10)
+
+top10_virtual.to_csv(
+    results_folder / "top10_virtual_catalysts.csv",
+    index=False
+)
+
+print("\nTop 10 virtual catalysts saved successfully.")
 
 # Save all EI-ranked catalysts
 ei_ranked.to_csv(results_folder / "ranked_virtual_catalysts.csv", index=False)
